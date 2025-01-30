@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bhutan Grid Distance Calculator</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.8.0/proj4.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1500px;
+            margin: 40px auto;
+            padding: 30px;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            color: #2c3e50;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 25px;
+        }
+        .controls {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+        }
+        #map {
+            height: 800px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            z-index: 1;
+        }
+        h2 {
+            color: #2c3e50;
+            margin-bottom: 25px;
+            font-size: 1.8em;
+            text-align: center;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 15px;
+        }
+        .input-group {
+            margin-bottom: 25px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #34495e;
+            font-size: 0.95em;
+        }
+        select, input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #dfe6e9;
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-size: 1em;
+            transition: all 0.3s ease;
+        }
+        select:focus, input:focus {
+            border-color: #3498db;
+            box-shadow: 0 0 8px rgba(52, 152, 219, 0.3);
+            outline: none;
+        }
+        button {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            padding: 14px 28px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1.1em;
+            font-weight: 600;
+            width: 100%;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.4);
+        }
+        .result {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 10px;
+            border: 1px solid #e9ecef;
+        }
+        .result-item {
+            margin: 15px 0;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .highlight {
+            color: #c0392b;
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+        .unit {
+            color: #7f8c8d;
+            font-size: 0.9em;
+            margin-left: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="controls">
+            <h2>Bhutan Grid Distance Calculator from Central Meridain (CM)</h2>
+            
+            <div class="input-group">
+                <label>🏞️ Select District:</label>
+                <select id="districtSelect">
+                    <option value="">-- Select District --</option>
+                    <!-- Options will be populated by JavaScript -->
+                </select>
+            </div>
+
+            <div class="input-group">
+                <label>📌 Current Easting (National Projection):</label>
+                <input type="number" id="easting" step="1" placeholder="Click map or enter easting (meters)">
+            </div>
+
+            <button onclick="calculateGridDistance()">📐 Calculate Distance</button>
+            
+            <div class="result" id="result">
+                <div class="result-item">
+                    <div>Distance from CM:</div>
+                    <span class="highlight" id="distanceResult">0</span><span class="unit">km</span>
+                </div>
+                <div class="result-item">
+                    <div>District CM Easting:</div>
+                    <span id="cmValue">-</span><span class="unit">meters</span>
+                </div>
+            </div>
+        </div>
+        
+        <div id="map"></div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // Define Bhutan National Grid (EPSG:5266)
+        proj4.defs("EPSG:5266","+proj=tmerc +lat_0=0 +lon_0=90 +k=1 +x_0=250000 +y_0=0 +ellps=GRS80 +units=m +no_defs");
+        
+        // District data with Central Meridians (longitude in degrees)
+        const districts = [
+            {name: "NATIONAL GRID", cmLon: 90},
+            {name: "BUMTHANG", cmLon: 90.733333},
+            {name: "CHUKHA", cmLon: 89.55},
+            {name: "DAGANA", cmLon: 89.85},
+            {name: "GASA", cmLon: 90.033333},
+            {name: "HA", cmLon: 90.15},
+            {name: "LHUENTSE", cmLon: 91.133333},
+            {name: "MONGAR", cmLon: 91.233333},
+            {name: "PARO", cmLon: 89.35},
+            {name: "PEMAGATSHEL", cmLon: 91.35},
+            {name: "PUNAKHA", cmLon: 89.85},
+            {name: "SAMDRUP JONGKHAR", cmLon: 91.566667},
+            {name: "SAMTSE", cmLon: 89.066667},
+            {name: "SARPANG", cmLon: 90.266667},
+            {name: "THIMPHU", cmLon: 89.55},
+            {name: "TRASHIGANG", cmLon: 91.75},
+            {name: "TRONGSA", cmLon: 90.5},
+            {name: "TSIRANG", cmLon: 90.166667},
+            {name: "WANGDUE PHODRANG", cmLon: 90.116667},
+            {name: "YANGTSE", cmLon: 91.566667},
+            {name: "ZHEMGANG", cmLon: 90.866667}
+        ];
+
+        let map;
+        let marker;
+        const bhutanCenter = [27.5142, 90.4336]; // Approximate center
+
+        function initMap() {
+            // Initialize Leaflet map
+            map = L.map('map').setView(bhutanCenter, 7);
+            
+            // Add OpenStreetMap tiles
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+
+            // Add click handler
+            map.on('click', function(e) {
+                if (marker) map.removeLayer(marker);
+                marker = L.marker(e.latlng).addTo(map);
+                
+                // Convert WGS84 to Bhutan Grid
+                const converted = proj4('WGS84', 'EPSG:5266', [e.latlng.lng, e.latlng.lat]);
+                document.getElementById('easting').value = Math.round(converted[0]);
+            });
+
+            // Populate district dropdown
+            const select = document.getElementById('districtSelect');
+            districts.forEach(district => {
+                const option = document.createElement('option');
+                option.value = district.cmLon;
+                option.textContent = `${district.name} (${district.cmLon.toFixed(6)}°E)`;
+                select.appendChild(option);
+            });
+        }
+
+        function calculateGridDistance() {
+            const cmLon = parseFloat(document.getElementById('districtSelect').value);
+            const currentEasting = parseFloat(document.getElementById('easting').value);
+
+            if (!cmLon || isNaN(currentEasting)) {
+                alert('Please select a district and provide easting value');
+                return;
+            }
+
+            // Convert CM longitude to grid easting
+            const cmEasting = proj4('WGS84', 'EPSG:5266', [cmLon, 0])[0];
+            const gridDistance = Math.abs(currentEasting - cmEasting)/1000;
+
+            // Display results
+            document.getElementById('distanceResult').textContent = gridDistance.toFixed(3);
+            document.getElementById('cmValue').textContent = cmEasting.toFixed(2);
+            document.getElementById('result').style.display = 'block';
+        }
+
+        // Initialize application
+        window.onload = initMap;
+    </script>
+</body>
+</html>
