@@ -7,7 +7,7 @@ const districts = [
     {name: "CHUKHA", cmLon: 89.55},
     {name: "GASA", cmLon: 90.033333},
     {name: "DAGANA", cmLon: 89.85},
-    {name: "HA", cmLon: 90.15},
+    {name: "HA", cmLon: 89.09},
     {name: "LHUENTSE", cmLon: 91.133333},
     {name: "MONGAR", cmLon: 91.233333},
     {name: "PARO", cmLon: 89.35},
